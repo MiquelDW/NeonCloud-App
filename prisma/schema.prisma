@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// enum type is a list of valid entries
+enum ProductCategories {
+  ui_kits
+  icons
+}
+
+enum Status {
+  pending
+  approved
+  denied
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  imageUrl  String
+  seller    Status   @default(pending)
+
+  // one-to-many relationship: one user can have multiple orders
+  Order   Order[]
+  Product Product[]
+  Request Request[]
+}
+
+model Request {
+  id                 String            @id @default(cuid())
+  // fk that stores userId that created the product
+  userId             String
+  productDescription String
+  category           ProductCategories
+  createdAt          DateTime          @default(now())
+
+  User User @relation(fields: [userId], references: [id])
+}
+
+model Product {
+  id            String            @id @default(cuid())
+  name          String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now())
+  description   String
+  price         Decimal
+  category      ProductCategories
+  status        Status            @default(pending)
+  terminated    Boolean           @default(false)
+  // storefront image to show to user
+  productImages String[]
+  // product / file that will actually be purchased by the user
+  productFile   String
+  // fk that stores userId that created the product
+  userId        String
+
+  User User @relation(fields: [userId], references: [id])
+
+  // many-to-many relationship: Products can appear in multiple Orders
+  OrderProduct OrderProduct[]
+}
+
+model ShippingAddress {
+  id          String  @id @default(cuid())
+  name        String
+  street      String
+  city        String
+  postalCode  String
+  country     String
+  state       String?
+  phoneNumber String?
+  // one-to-many relationship: one ShippingAddress can have multiple Orders
+  orders      Order[]
+}
+
+model BillingAddress {
+  id          String  @id @default(cuid())
+  name        String
+  street      String
+  city        String
+  postalCode  String
+  country     String
+  state       String?
+  phoneNumber String?
+  // one-to-many relationship: one BillingAddress can have multiple Orders
+  orders      Order[]
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  isPaid            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  // fk stores the ID of the related 'User' record
+  userId            String
+  // fk stores the ID of the related 'ShippingAddress' record
+  shippingAddressId String?
+  // fk stores the ID of the related 'BillingAddress' record
+  billingAddressId  String?
+
+  // many-to-one relationships: each Order is associated with one User, and optionally one ShippingAddress and one BillingAddress
+  User            User             @relation(fields: [userId], references: [id])
+  shippingAddress ShippingAddress? @relation(fields: [shippingAddressId], references: [id])
+  billingAddress  BillingAddress?  @relation(fields: [billingAddressId], references: [id])
+
+  // many-to-many relationship: Orders can have multiple Products
+  OrderProduct OrderProduct[]
+}
+
+// join table that represents many-to-many relationship between Order & Product tables
+model OrderProduct {
+  orderId   String
+  productId String
+  createdAt DateTime @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  // composite primary key
+  @@id([orderId, productId])
+}
